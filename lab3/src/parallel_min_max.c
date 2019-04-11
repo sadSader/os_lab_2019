@@ -91,29 +91,69 @@ int main(int argc, char **argv) {
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
 
-  for (int i = 0; i < pnum; i++) {
+int pipefd[2];
+
+if (with_files) 
+        {
+          // use files here
+        }
+        else 
+        {
+           // init pipe here
+            
+            if (pipe(pipefd) == -1) {
+               perror("pipe");
+               exit(EXIT_FAILURE);
+           }
+            
+       
+        }
+
+  for (int i = 0; i < pnum; i++) 
+  {
     pid_t child_pid = fork();
     if (child_pid >= 0) {
       // successful fork
       active_child_processes += 1;
-      if (child_pid == 0) {
+      if (child_pid == 0) 
+      {
         // child process
-
+        
+        int begin=array_size/pnum*(active_child_processes-1);
+        int end=min(array_size/pnum*(active_child_processes), array_size);
+         printf("%d %d ", begin, end );
+        struct MinMax minMax=GetMinMax(array, begin, end);
+        printf("%d %d ", minMax.min, minMax.max);
         // parallel somehow
 
-        if (with_files) {
+        if (with_files) 
+        {
           // use files here
-        } else {
+        }
+        else 
+        {
+            close(pipefd[0]);
+            //char* intBuffer= malloc(sizeof(char) * 20);
+            //sprintf(intBuffer, "%d", minMax.min);
+            //char* strMin=strcat(intBuffer, " ");
+            //sprintf(intBuffer, "%d", minMax.max);
+            char* strMin="min";
+            char* strMax="max";
+            //char* strMax=strcat(intBuffer, " ");
+            write(pipefd[1], strMin, strlen(strMin));
+            write(pipefd[1], strMax, strlen(strMax));
+            
           // use pipe here
         }
+        
         return 0;
-      }
+     }//child process
 
     } else {
       printf("Fork failed!\n");
       return 1;
     }
-  }
+ }
 
   while (active_child_processes > 0) {
     // your code here
@@ -132,6 +172,11 @@ int main(int argc, char **argv) {
     if (with_files) {
       // read from files
     } else {
+        
+        char buf;
+        while (read(pipefd[0], &buf, 1) > 0)
+                   printf( "%s",&buf);
+                   
       // read from pipes
     }
 
