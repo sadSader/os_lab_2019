@@ -15,6 +15,8 @@
 #include "find_min_max.h"
 #include "utils.h"
 
+#define FILEPATH "data.txt"
+
 int main(int argc, char **argv) {
   int seed = -1;
   int array_size = -1;
@@ -95,11 +97,14 @@ int pipefd[2];
 
 if (with_files) 
         {
+            remove(FILEPATH);
           // use files here
         }
         else 
         {
            // init pipe here
+            write(pipefd[1], argv[1], strlen(argv[1]));
+            
             
             if (pipe(pipefd) == -1) {
                perror("pipe");
@@ -121,27 +126,41 @@ if (with_files)
         
         int begin=array_size/pnum*(active_child_processes-1);
         int end=min(array_size/pnum*(active_child_processes), array_size);
-         printf("%d %d ", begin, end );
+        // printf("%d %d ", begin, end );
         struct MinMax minMax=GetMinMax(array, begin, end);
-        printf("%d %d ", minMax.min, minMax.max);
+        //printf("%d %d ", minMax.min, minMax.max);
         // parallel somehow
 
+        char* intBuffer= malloc(sizeof(char) * 20);
+        sprintf(intBuffer, "%d", minMax.min);
+        char* strMin=strcat(intBuffer, " ");
+        sprintf(intBuffer, "%d", minMax.max);
+        char* strMax=strcat(intBuffer, " ");
+        
+        //char* strMin="min";
+        //char* strMax="max";
+        
         if (with_files) 
         {
           // use files here
+          FILE *fp;
+          fp=fopen(FILEPATH, "a+");
+          printf("%s ", "file opened/n");
+          fprintf(fp, strMin);
+          fprintf(fp, strMax);
+          fclose(fp);
+          printf("%s ", "file closed/n");
         }
         else 
         {
-            close(pipefd[0]);
-            //char* intBuffer= malloc(sizeof(char) * 20);
-            //sprintf(intBuffer, "%d", minMax.min);
-            //char* strMin=strcat(intBuffer, " ");
-            //sprintf(intBuffer, "%d", minMax.max);
-            char* strMin="min";
-            char* strMax="max";
-            //char* strMax=strcat(intBuffer, " ");
+            close(pipefd[0]);         
+            
+            printf("pipefd %d" , pipefd[1]);
             write(pipefd[1], strMin, strlen(strMin));
             write(pipefd[1], strMax, strlen(strMax));
+            
+            close(pipefd[1]);
+           _exit(EXIT_SUCCESS);
             
           // use pipe here
         }
@@ -157,7 +176,8 @@ if (with_files)
 
   while (active_child_processes > 0) {
     // your code here
-
+    int unused;
+    wait(&unused);
     active_child_processes -= 1;
   }
 
@@ -168,18 +188,25 @@ if (with_files)
   for (int i = 0; i < pnum; i++) {
     int min = INT_MAX;
     int max = INT_MIN;
-
+    int* returned=malloc(sizeof(int)*2*pnum);
+    
     if (with_files) {
       // read from files
-    } else {
         
+        FILE* file = fopen(FILEPATH, "r");
+        
+        for(int i=0;i<pnum*2;++i)
+            fscanf(file, "%i", returned+i);
+      
+    } else {
+          // read from pipes
         char buf;
         while (read(pipefd[0], &buf, 1) > 0)
                    printf( "%s",&buf);
                    
-      // read from pipes
-    }
 
+    }
+    min_max=GetMinMax(returned, 0, 2*pnum);
     if (min < min_max.min) min_max.min = min;
     if (max > min_max.max) min_max.max = max;
   }
@@ -191,7 +218,9 @@ if (with_files)
   elapsed_time += (finish_time.tv_usec - start_time.tv_usec) / 1000.0;
 
   free(array);
-
+  
+  
+    
   printf("Min: %d\n", min_max.min);
   printf("Max: %d\n", min_max.max);
   printf("Elapsed time: %fms\n", elapsed_time);
