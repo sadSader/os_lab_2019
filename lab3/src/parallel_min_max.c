@@ -123,10 +123,8 @@ if (with_files)
       if (child_pid == 0) 
       {
         // child process
-        
         int begin=array_size/pnum*(active_child_processes-1);
         int end=min(array_size/pnum*(active_child_processes), array_size);
-        // printf("%d %d ", begin, end );
         struct MinMax minMax=GetMinMax(array, begin, end);
         //printf("%d %d ", minMax.min, minMax.max);
         // parallel somehow
@@ -145,22 +143,18 @@ if (with_files)
           // use files here
           FILE *fp;
           fp=fopen(FILEPATH, "a+");
-          printf("%s ", "file opened/n");
-          fprintf(fp, strMin);
-          fprintf(fp, strMax);
+          fprintf(fp, "%s", strMin);
+          fprintf(fp, "%s", strMax);
           fclose(fp);
-          printf("%s ", "file closed/n");
         }
         else 
         {
             close(pipefd[0]);         
-            
-            printf("pipefd %d" , pipefd[1]);
+            printf("%s ","writing");
             write(pipefd[1], strMin, strlen(strMin));
             write(pipefd[1], strMax, strlen(strMax));
             
             close(pipefd[1]);
-           _exit(EXIT_SUCCESS);
             
           // use pipe here
         }
@@ -201,6 +195,7 @@ if (with_files)
     } else {
           // read from pipes
         char buf;
+        printf("%s ", "reading");//wtf
         while (read(pipefd[0], &buf, 1) > 0)
                    printf( "%s",&buf);
                    
