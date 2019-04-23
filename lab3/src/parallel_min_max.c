@@ -103,9 +103,8 @@ int main(int argc, char **argv)
 	
 	remove(PARENTLOG);
     p_log = fopen(PARENTLOG, "a+");
-    for(int i=0;i<array_size;++i) 
-        fprintf(p_log, "%i ", array[i]);
-
+    /*for(int i=0;i<array_size;++i) 
+*/
 	if (with_files)
 	{
 		remove(FILEPATH);
@@ -115,8 +114,6 @@ int main(int argc, char **argv)
 	else
 	{
 		// init pipe here
-//		write(pipefd[1], argv[1], strlen(argv[1]));
-
 
 		if (pipe(pipefd) == -1) {
 			perror("pipe");
@@ -125,84 +122,69 @@ int main(int argc, char **argv)
 
 
 	}
-
-	for (int i = 0; i < pnum; i++)
-	{
+	for (int i = 0; i < pnum; ++i){
 		pid_t child_pid = fork();
-		if (child_pid >= 0)
-		{
+		if (child_pid >= 0){
 			// successful fork
 			if (child_pid > 0)
 			{
-			//	fprintf(p_log, "i: %i \n", i);
-				fprintf(p_log, "forked, pid: %i \n", (int)child_pid);
-			//	fprintf(p_log, "childs: %i, %i ", active_child_processes, child_pid);
 				(childs[active_child_processes] = child_pid);
-				//fprintf(p_log, "childs check: %i \n", childs[active_child_processes]);
 
 				active_child_processes += 1;
-
 			}
 
-			if (child_pid == 0)
-			{
+			if (child_pid == 0){
 				// child process
 				int begin = array_size / pnum * (active_child_processes);
 				int end = min(array_size / pnum * (active_child_processes+1), array_size);
 				struct MinMax minMax = GetMinMax(array, begin, end);
 				// parallel somehow
 
-				char* intBuffer = malloc(sizeof(char) * 20);
-				sprintf(intBuffer, "%d", minMax.min);
-				char* strMin = strcat(intBuffer, " ");
-				sprintf(intBuffer, "%d", minMax.max);
-				char* strMax = strcat(intBuffer, " ");
-
+				
 				//char* strMin="min";
 				//char* strMax="max";
 
-				if (with_files)
-				{
+				if (with_files){
 					// use files here
-
+                char* intBuffer = malloc(sizeof(char) * 20);
+				sprintf(intBuffer, "%d %d \n", minMax.min, minMax.max);
+				        
 					FILE *fp;
 					fp = fopen(FILEPATH, "a+");
-					fprintf(fp, "%s", strMin);
-					fprintf(fp, "%s", strMax);
+					fprintf(fp, "%s", intBuffer);
 					fclose(fp);
 				}
-				else
-				{
-					//close(pipefd[0]);        
-					write(pipefd[1], strMin, strlen(strMin));
-					write(pipefd[1], strMax, strlen(strMax));
-
-					//close(pipefd[1]);
+				else{//using pipes
+					close(pipefd[0]);
+                  //  printf(" writen %d %d \n", minMax.min, minMax.max);
+				    write(pipefd[1], &minMax, sizeof(minMax));
+					close(pipefd[1]);
 
 					// use pipe here
 				}
-				printf("child exit\n");
+				//printf("child exit\n");
 				return 0;
 			}//child process
 			 //child_pid>=0 
 		}
-		else
-		{
+		else{
 			printf("Fork failed!\n");
 			return 1;
 		}
-		//printf("i:%i\n",i);
-		//printf("pnum::%i", pnum );
+		
+	}//fork
+	
+	for(int i=0; i<pnum; ++i){
+	   		fprintf(p_log, "child[%i], pid: %i \n", i, childs[i]);
+	   		
+	   		
+   		}
 
-	}
 
 		//parent
-		printf("wait");
-		fprintf(p_log, "pnum: %i\n", pnum);
 	
 		for (int i = 0; i<pnum; ++i)//waiting
 		{
-			//printf("waiting for : %n", childs+i);
 			waitpid(childs[i], &i, 0);
 		}
 
@@ -219,8 +201,7 @@ int main(int argc, char **argv)
 		min_max.min = INT_MAX;
 		min_max.max = INT_MIN;
 
-		for (int i = 0; i < pnum; i++)
-		{
+		//for (int i = 0; i < pnum; i++){
 			int min = INT_MAX;
 			int max = INT_MIN;
 			int* returned = malloc(sizeof(int) * 2 * pnum);
@@ -231,25 +212,40 @@ int main(int argc, char **argv)
 
 				FILE* file = fopen(FILEPATH, "r");
 
-				for (int i = 0; i<pnum * 2; ++i)
-					{
-
-					    fscanf(file, "%i", returned + i);
+				for (int i = 0; i<pnum * 2; ++i){
+				    fscanf(file, "%i", returned + i);
 				    }
 
 			}
-			else
-			{
+			else{
 				// read from pipes
-				char buf;
-				printf("%s ", "reading");//wtf
-				while (read(pipefd[0], &buf, 1) > 0)
-					printf("%s", &buf);
+				struct MinMax buf;
+				//printf("%s ", "reading");//wtf
+				int status=read(pipefd[0], &buf, sizeof(&buf));
+				for(int i=0; i<pnum;++i){
+				    if (status<=0){
+				        printf("pipe error");
+				        fflush(NULL);
+			        }
+
+					//printf("min: %i, max:%i ,childs:%i \n", buf.min, buf.max, active_child_processes);
+					returned[2*i]=buf.min;
+					returned[2*i+1]=buf.max;
+					fflush(NULL);
+
+					status=read(pipefd[0], &buf, 1);
+				}
+					
+					
+					
 			}
+			
+			for(int i=0; i<pnum*2;++i)
+			     printf("%i \n", returned[i]);
 			min_max = GetMinMax(returned, 0, 2 * pnum);
 			if (min < min_max.min) min_max.min = min;
 			if (max > min_max.max) min_max.max = max;
-		}//for
+		//}//for
 
 		struct timeval finish_time;
 		gettimeofday(&finish_time, NULL);
@@ -258,10 +254,9 @@ int main(int argc, char **argv)
 		elapsed_time += (finish_time.tv_usec - start_time.tv_usec) / 1000.0;
 
 		free(array);
+		free(childs);
 
-
-
-		printf("Min: %d\n", min_max.min);
+        printf("Min: %d\n", min_max.min);
 		printf("Max: %d\n", min_max.max);
 		printf("Elapsed time: %fms\n", elapsed_time);
 		fflush(NULL);
