@@ -1,3 +1,4 @@
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -51,7 +52,12 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
   }
-
+    buf="CLOSE";
+     if (write(fd, buf, nread) < 0) {
+      perror("write");
+      exit(1);
+    }
+    
   close(fd);
   exit(0);
 }
